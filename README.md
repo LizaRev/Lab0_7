@@ -1,6 +1,5 @@
 ### Lab0_7
 
-# Lab0_7
 
 ## M1 — Test suite
 
