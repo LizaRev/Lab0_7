@@ -165,7 +165,9 @@ export class Ship extends Entity {
       this
     );
 
-    this.world.spawn(bullet);
+    this.world.spawn(
+      bullet
+    );
 
     this.world.dispatchEvent(
       new CustomEvent('fired', {

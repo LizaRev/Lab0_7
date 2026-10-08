@@ -4,6 +4,8 @@ type LoopOptions = {
   render: (alpha: number) => void;
 };
 
+const MAX_FRAME_SAMPLES = 2000;
+
 export function createLoop({
   step = 1 / 60,
   simulate,
@@ -23,6 +25,8 @@ export function createLoop({
 
   let stepsPerSecond = 0;
   let framesPerSecond = 0;
+
+  const frameTimeSamples: number[] = [];
 
 
   function frame(time: number): void {
@@ -84,6 +88,18 @@ export function createLoop({
 
 
     if (
+      frameTimeSamples.length <
+      MAX_FRAME_SAMPLES
+    ) {
+
+      frameTimeSamples.push(
+        lastFrameDuration
+      );
+
+    }
+
+
+    if (
       time - statsTimer >= 1000
     ) {
 
@@ -132,6 +148,8 @@ export function createLoop({
 
       accumulator = 0;
 
+      frameTimeSamples.length = 0;
+
 
       animationId =
         requestAnimationFrame(frame);
@@ -150,9 +168,11 @@ export function createLoop({
 
 
       if (animationId !== null) {
+
         cancelAnimationFrame(
           animationId
         );
+
       }
 
     },
@@ -166,7 +186,10 @@ export function createLoop({
 
         framesPerSecond,
 
-        lastFrameDuration
+        lastFrameDuration,
+
+        frameTimeSamples:
+          [...frameTimeSamples]
 
       };
 

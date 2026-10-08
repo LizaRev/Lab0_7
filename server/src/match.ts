@@ -5,6 +5,7 @@ import { Pickup } from "../../shared/sim/pickup.js";
 import { attachHoming } from "../../shared/sim/homing.js";
 import { Vector2 } from "../../shared/sim/vector.js";
 import { Entity } from "../../shared/sim/entity.js";
+import { BotAI } from "./bot-ai.js";
 
 import {
   MESSAGE_TYPES,
@@ -53,8 +54,15 @@ export class Match {
 
   ships: Map<PlayerId, Ship>;
 
+  bots: Map<PlayerId, BotAI>;
+
+  botShips: Map<PlayerId, Ship>;
+
   tickRate: number;
   tickMs: number;
+
+  tickDurations: number[];
+  tickSamplesLimit: number;
 
   timer: ReturnType<typeof setTimeout> | null;
   nextTickTime: number | null;
@@ -73,8 +81,15 @@ export class Match {
 
     this.ships = new Map<PlayerId, Ship>();
 
+    this.bots = new Map<PlayerId, BotAI>();
+
+    this.botShips = new Map<PlayerId, Ship>();
+
     this.tickRate = 30;
     this.tickMs = 1000 / this.tickRate;
+
+    this.tickDurations = [];
+    this.tickSamplesLimit = 5000;
 
     this.timer = null;
     this.nextTickTime = null;
@@ -229,6 +244,111 @@ export class Match {
     );
   }
 
+  addBots(
+    count: number
+  ): void {
+    if (
+      !Number.isInteger(count) ||
+      count <= 0
+    ) {
+      return;
+    }
+
+    const existingBots =
+      this.bots.size;
+
+    for (
+      let index = 0;
+      index < count;
+      index++
+    ) {
+      const botNumber =
+        existingBots +
+        index +
+        1;
+
+      const botId =
+        `bot-${botNumber}`;
+
+      if (
+        this.bots.has(botId)
+      ) {
+        continue;
+      }
+
+      const spawnPositions = [
+        {
+          x: 200,
+          y: 150,
+        },
+        {
+          x: 600,
+          y: 150,
+        },
+        {
+          x: 200,
+          y: 400,
+        },
+        {
+          x: 600,
+          y: 400,
+        },
+        {
+          x: 100,
+          y: 300,
+        },
+        {
+          x: 700,
+          y: 300,
+        },
+        {
+          x: 350,
+          y: 100,
+        },
+        {
+          x: 450,
+          y: 400,
+        },
+      ];
+
+      const position =
+        spawnPositions[
+          index %
+          spawnPositions.length
+        ];
+
+      if (!position) {
+        continue;
+      }
+
+      const ship =
+        new Ship(
+          position.x,
+          position.y
+        );
+
+      this.world.spawn(
+        ship
+      );
+
+      const ai =
+        new BotAI(
+          ship,
+          this.world
+        );
+
+      this.botShips.set(
+        botId,
+        ship
+      );
+
+      this.bots.set(
+        botId,
+        ai
+      );
+    }
+  }
+
   findFreeShip(): Ship | undefined {
     for (
       const entity of
@@ -249,6 +369,22 @@ export class Match {
       for (
         const assignedShip of
         this.ships.values()
+      ) {
+        if (
+          assignedShip === ship
+        ) {
+          assigned = true;
+          break;
+        }
+      }
+
+      if (assigned) {
+        continue;
+      }
+
+      for (
+        const assignedShip of
+        this.botShips.values()
       ) {
         if (
           assignedShip === ship
@@ -435,6 +571,9 @@ export class Match {
   }
 
   tick(): void {
+    const tickStart =
+      performance.now();
+
     const dt =
       this.tickMs / 1000;
 
@@ -591,6 +730,84 @@ export class Match {
         current.fire;
     }
 
+    for (
+      const [botId, ai]
+      of this.bots
+    ) {
+      let ship =
+        this.botShips.get(
+          botId
+        );
+
+      if (
+        !ship ||
+        !ship.alive
+      ) {
+        const newShip =
+          this.createBotShip(
+            botId
+          );
+
+        if (!newShip) {
+          continue;
+        }
+
+        ship = newShip;
+      }
+
+      const botInput =
+        ai.update(
+          dt
+        );
+
+      const input: InputHandler = {
+        isDown: (
+          action: string
+        ): boolean => {
+          if (
+            action ===
+            "ArrowLeft"
+          ) {
+            return botInput.left;
+          }
+
+          if (
+            action ===
+            "ArrowRight"
+          ) {
+            return botInput.right;
+          }
+
+          if (
+            action ===
+            "ArrowUp"
+          ) {
+            return botInput.thrust;
+          }
+
+          if (
+            action ===
+            "Space"
+          ) {
+            return botInput.fire;
+          }
+
+          return false;
+        },
+      };
+
+      shipInputs.set(
+        ship,
+        input
+      );
+
+      if (
+        botInput.fire
+      ) {
+        ship.fire();
+      }
+    }
+
     this.world.step(
       dt,
       {
@@ -655,7 +872,177 @@ export class Match {
       );
     }
 
+    for (
+      const ship of
+      this.botShips.values()
+    ) {
+      if (
+        ship.alive
+      ) {
+        this.wrapShip(
+          ship
+        );
+      }
+    }
+
     this.broadcastSnapshots();
+
+    const tickDuration =
+      performance.now() -
+      tickStart;
+
+    if (
+      this.tickDurations.length <
+      this.tickSamplesLimit
+    ) {
+      this.tickDurations.push(
+        tickDuration
+      );
+    }
+  }
+
+  getTickStats(): {
+    samples: number;
+    p50: number;
+    p95: number;
+    p99: number;
+  } {
+    const sorted =
+      [...this.tickDurations].sort(
+        (a, b) => a - b
+      );
+
+    if (
+      sorted.length === 0
+    ) {
+      return {
+        samples: 0,
+        p50: 0,
+        p95: 0,
+        p99: 0
+      };
+    }
+
+    const percentile = (
+      value: number
+    ): number => {
+      const index =
+        Math.min(
+          sorted.length - 1,
+          Math.max(
+            0,
+            Math.ceil(
+              (value / 100) *
+                sorted.length
+            ) - 1
+          )
+        );
+
+      return (
+        sorted[index] ?? 0
+      );
+    };
+
+    return {
+      samples:
+        sorted.length,
+
+      p50:
+        percentile(50),
+
+      p95:
+        percentile(95),
+
+      p99:
+        percentile(99)
+    };
+  }
+
+  createBotShip(
+    botId: PlayerId
+  ): Ship | null {
+    const spawnPositions = [
+      {
+        x: 200,
+        y: 150,
+      },
+      {
+        x: 600,
+        y: 150,
+      },
+      {
+        x: 200,
+        y: 400,
+      },
+      {
+        x: 600,
+        y: 400,
+      },
+      {
+        x: 100,
+        y: 300,
+      },
+      {
+        x: 700,
+        y: 300,
+      },
+      {
+        x: 350,
+        y: 100,
+      },
+      {
+        x: 450,
+        y: 400,
+      },
+    ];
+
+    const botIndex =
+      Number(
+        botId.replace(
+          "bot-",
+          ""
+        )
+      ) - 1;
+
+    const position =
+      spawnPositions[
+        Math.max(
+          0,
+          botIndex
+        ) %
+        spawnPositions.length
+      ];
+
+    if (!position) {
+      return null;
+    }
+
+    const ship =
+      new Ship(
+        position.x,
+        position.y
+      );
+
+    this.world.spawn(
+      ship
+    );
+
+    ship.restoreHp();
+
+    this.botShips.set(
+      botId,
+      ship
+    );
+
+    this.bots.set(
+      botId,
+      new BotAI(
+        ship,
+        this.world
+      )
+    );
+
+    return ship;
   }
 
   wrapShip(

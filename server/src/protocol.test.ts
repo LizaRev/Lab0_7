@@ -1,46 +1,50 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, test } from 'vitest';
 
 import {
   MESSAGE_TYPES,
   parseClientMessage,
-} from "./protocol.js";
+} from './protocol.js';
 
-test("parseClientMessage accepts valid join message", () => {
-  const result = parseClientMessage({
-    version: 1,
-    type: MESSAGE_TYPES.JOIN,
-    roomId: "alpha",
-    name: "Liza",
+describe('client protocol', () => {
+  test('parseClientMessage accepts valid join message', () => {
+    const result = parseClientMessage({
+      version: 1,
+      type: MESSAGE_TYPES.JOIN,
+      roomId: 'alpha',
+      name: 'Liza',
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.message.type).toBe(MESSAGE_TYPES.JOIN);
+
+      if (result.message.type === MESSAGE_TYPES.JOIN) {
+        expect(result.message.roomId).toBe('alpha');
+        expect(result.message.name).toBe('Liza');
+      }
+    }
   });
 
-  assert.equal(result.ok, true);
+  test('parseClientMessage rejects invalid message', () => {
+    const result = parseClientMessage({
+      version: 999,
+      type: MESSAGE_TYPES.JOIN,
+      roomId: 'alpha',
+      name: 'Liza',
+    });
 
-  if (result.ok) {
-    assert.equal(result.message.type, MESSAGE_TYPES.JOIN);
-    assert.equal(result.message.roomId, "alpha");
-    assert.equal(result.message.name, "Liza");
-  }
-});
-
-test("parseClientMessage rejects invalid message", () => {
-  const result = parseClientMessage({
-    version: 999,
-    type: MESSAGE_TYPES.JOIN,
-    roomId: "alpha",
-    name: "Liza",
+    expect(result.ok).toBe(false);
   });
 
-  assert.equal(result.ok, false);
-});
+  test('parseClientMessage rejects unsupported server message', () => {
+    const result = parseClientMessage({
+      version: 1,
+      type: MESSAGE_TYPES.ROSTER,
+      roomId: 'alpha',
+      players: [],
+    });
 
-test("parseClientMessage rejects unsupported server message", () => {
-  const result = parseClientMessage({
-    version: 1,
-    type: MESSAGE_TYPES.ROSTER,
-    roomId: "alpha",
-    players: [],
+    expect(result.ok).toBe(false);
   });
-
-  assert.equal(result.ok, false);
 });

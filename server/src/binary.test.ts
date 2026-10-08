@@ -1,169 +1,155 @@
-import test from "node:test";
-
-import assert from "node:assert/strict";
+import { describe, expect, test } from 'vitest';
 
 import {
   encodeSnapshot,
   decodeSnapshot,
-} from "../../shared/protocol/binary.js";
+} from '../../shared/protocol/binary.js';
 
 import type {
   SnapshotMessageWithWorld,
-} from "../../shared/protocol/binary.js";
+} from '../../shared/protocol/binary.js';
 
-test("binary snapshot encode/decode keeps data", () => {
-  const snapshot: SnapshotMessageWithWorld = {
-    version: 1,
+describe('binary protocol', () => {
+  test('binary snapshot encode/decode keeps data', () => {
+    const snapshot: SnapshotMessageWithWorld = {
+      version: 1,
 
-    type: "snapshot",
+      type: 'snapshot',
 
-    roomId: "alpha",
+      roomId: 'alpha',
 
-    playerId: "player-1",
+      playerId: 'player-1',
 
-    playerShipId: "1",
+      playerShipId: '1',
 
-    lastProcessedSeq: 5,
+      lastProcessedSeq: 5,
 
-    world: {
-      width: 800,
+      world: {
+        width: 800,
 
-      height: 500,
+        height: 500,
 
-      score: 100,
+        score: 100,
 
-      entities: [
-        {
-          id: "1",
+        entities: [
+          {
+            id: '1',
 
-          kind: "ship",
+            kind: 'ship',
 
-          x: 100,
+            x: 100,
 
-          y: 200,
+            y: 200,
 
-          angle: 1,
+            angle: 1,
 
-          vx: 10,
+            vx: 10,
 
-          vy: 20,
+            vy: 20,
 
-          radius: 20,
+            radius: 20,
 
-          hp: 3,
+            hp: 3,
 
-          thrust: 0.5,
+            thrust: 0.5,
 
-          shield: true,
+            shield: true,
 
-          alive: true,
-        },
-      ],
-    },
-  };
+            alive: true,
+          },
+        ],
+      },
+    };
 
-  const encoded = encodeSnapshot(snapshot);
+    const encoded = encodeSnapshot(snapshot);
 
-  const decoded = decodeSnapshot(encoded);
+    const decoded = decodeSnapshot(encoded);
 
-  assert.equal(
-    decoded.version,
-    snapshot.version
-  );
+    expect(decoded.version).toBe(
+      snapshot.version
+    );
 
-  assert.equal(
-    decoded.type,
-    snapshot.type
-  );
+    expect(decoded.type).toBe(
+      snapshot.type
+    );
 
-  assert.equal(
-    decoded.roomId,
-    snapshot.roomId
-  );
+    expect(decoded.roomId).toBe(
+      snapshot.roomId
+    );
 
-  assert.equal(
-    decoded.lastProcessedSeq,
-    snapshot.lastProcessedSeq
-  );
+    expect(decoded.lastProcessedSeq).toBe(
+      snapshot.lastProcessedSeq
+    );
 
-  assert.equal(
-    decoded.playerShipId,
-    "1"
-  );
+    expect(decoded.playerShipId).toBe(
+      '1'
+    );
 
-  assert.equal(
-    decoded.world.width,
-    snapshot.world.width
-  );
+    expect(decoded.world.width).toBe(
+      snapshot.world.width
+    );
 
-  assert.equal(
-    decoded.world.height,
-    snapshot.world.height
-  );
+    expect(decoded.world.height).toBe(
+      snapshot.world.height
+    );
 
-  assert.equal(
-    decoded.world.score,
-    snapshot.world.score
-  );
+    expect(decoded.world.score).toBe(
+      snapshot.world.score
+    );
 
-  assert.equal(
-    decoded.world.entities.length,
-    1
-  );
+    expect(decoded.world.entities.length).toBe(
+      1
+    );
 
-  const entity =
-    decoded.world.entities[0];
+    const entity =
+      decoded.world.entities[0];
 
-  assert.ok(entity);
+    expect(entity).toBeDefined();
 
-  assert.equal(
-    entity.id,
-    "1"
-  );
+    if (!entity) {
+      return;
+    }
 
-  assert.equal(
-    entity.kind,
-    "ship"
-  );
+    expect(entity.id).toBe(
+      '1'
+    );
 
-  assert.equal(
-    entity.x,
-    100
-  );
+    expect(entity.kind).toBe(
+      'ship'
+    );
 
-  assert.equal(
-    entity.y,
-    200
-  );
+    expect(entity.x).toBe(
+      100
+    );
 
-  assert.equal(
-    entity.vx,
-    10
-  );
+    expect(entity.y).toBe(
+      200
+    );
 
-  assert.equal(
-    entity.vy,
-    20
-  );
+    expect(entity.vx).toBe(
+      10
+    );
 
-  assert.equal(
-    entity.radius,
-    20
-  );
+    expect(entity.vy).toBe(
+      20
+    );
 
-  assert.equal(
-    entity.hp,
-    3
-  );
+    expect(entity.radius).toBe(
+      20
+    );
 
-  assert.equal(
-    entity.thrust,
-    0.5
-  );
+    expect(entity.hp).toBe(
+      3
+    );
 
-  assert.ok(
-    Math.abs(
-      (entity.angle ?? 0) - 1
-    ) < 0.001
-  );
+    expect(entity.thrust).toBe(
+      0.5
+    );
+
+    expect(
+      Math.abs(
+        (entity.angle ?? 0) - 1
+      )
+    ).toBeLessThan(0.001);
+  });
 });

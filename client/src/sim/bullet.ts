@@ -32,12 +32,13 @@ export class Bullet extends Entity {
     _inputs?: unknown
   ): void {
     if (this.homing) {
-      const homing = this.homing as {
-        update: (
-          entity: Entity,
-          dt: number
-        ) => void;
-      };
+      const homing =
+        this.homing as {
+          update: (
+            entity: Entity,
+            dt: number
+          ) => void;
+        };
 
       homing.update(
         this,

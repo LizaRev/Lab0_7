@@ -31,7 +31,6 @@ export class Asteroid extends Entity {
 
     this.hp = 3;
     this.homing = null;
-
     this.shootTimer = 3;
   }
 
@@ -45,51 +44,23 @@ export class Asteroid extends Entity {
     const height = inputs.height;
 
     if (this.pos.x - this.radius < 0) {
-      this.pos = new Vector2(
-        this.radius,
-        this.pos.y
-      );
-
-      this.vel = new Vector2(
-        Math.abs(this.vel.x),
-        this.vel.y
-      );
+      this.pos.x = this.radius;
+      this.vel.x = Math.abs(this.vel.x);
     }
 
     if (this.pos.x + this.radius > width) {
-      this.pos = new Vector2(
-        width - this.radius,
-        this.pos.y
-      );
-
-      this.vel = new Vector2(
-        -Math.abs(this.vel.x),
-        this.vel.y
-      );
+      this.pos.x = width - this.radius;
+      this.vel.x = -Math.abs(this.vel.x);
     }
 
     if (this.pos.y - this.radius < 0) {
-      this.pos = new Vector2(
-        this.pos.x,
-        this.radius
-      );
-
-      this.vel = new Vector2(
-        this.vel.x,
-        Math.abs(this.vel.y)
-      );
+      this.pos.y = this.radius;
+      this.vel.y = Math.abs(this.vel.y);
     }
 
     if (this.pos.y + this.radius > height) {
-      this.pos = new Vector2(
-        this.pos.x,
-        height - this.radius
-      );
-
-      this.vel = new Vector2(
-        this.vel.x,
-        -Math.abs(this.vel.y)
-      );
+      this.pos.y = height - this.radius;
+      this.vel.y = -Math.abs(this.vel.y);
     }
 
     this.shootTimer -= dt;
@@ -117,28 +88,46 @@ export class Asteroid extends Entity {
       return;
     }
 
-    const direction = new Vector2(
-      target.pos.x - this.pos.x,
-      target.pos.y - this.pos.y
-    ).normalize();
+    const dx =
+      target.pos.x -
+      this.pos.x;
+
+    const dy =
+      target.pos.y -
+      this.pos.y;
+
+    const length =
+      Math.hypot(dx, dy);
+
+    if (length === 0) {
+      return;
+    }
+
+    const directionX =
+      dx / length;
+
+    const directionY =
+      dy / length;
 
     const bulletSpeed = 500;
 
     const bulletX =
       this.pos.x +
-      direction.x *
-        (this.radius + 5);
+      directionX *
+      (this.radius + 5);
 
     const bulletY =
       this.pos.y +
-      direction.y *
-        (this.radius + 5);
+      directionY *
+      (this.radius + 5);
 
     const bulletVx =
-      direction.x * bulletSpeed;
+      directionX *
+      bulletSpeed;
 
     const bulletVy =
-      direction.y * bulletSpeed;
+      directionY *
+      bulletSpeed;
 
     const bullet = new Bullet(
       bulletX,

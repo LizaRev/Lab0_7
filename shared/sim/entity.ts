@@ -26,6 +26,7 @@ export class Entity {
   readonly id: EntityId;
 
   pos: Vector2;
+  previousPos: Vector2;
   vel: Vector2;
 
   angle: number;
@@ -48,6 +49,7 @@ export class Entity {
     this.id = Entity.#nextId++ as EntityId;
 
     this.pos = new Vector2(x, y);
+    this.previousPos = new Vector2(x, y);
     this.vel = new Vector2(vx, vy);
 
     this.angle = angle;
@@ -60,6 +62,8 @@ export class Entity {
   }
 
   update(dt: number, _inputs?: unknown): void {
+    this.previousPos = this.pos;
+
     this.pos = this.pos.add(
       this.vel.scale(dt)
     );

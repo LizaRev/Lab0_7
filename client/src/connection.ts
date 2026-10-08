@@ -1,4 +1,3 @@
-import { decodeBinaryMessage } from "../../shared/protocol/binary.js";
 import {
   parseMessage,
   type Message,
@@ -22,6 +21,16 @@ type ConnectionOptions = {
   onerror?: ((event: Event | Error) => void) | null;
 };
 
+type DecodeResponse =
+  | {
+      ok: true;
+      message: Message;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 export class Connection {
   url: string;
   reconnectDelays: number[];
@@ -36,6 +45,8 @@ export class Connection {
   reconnectAttempt: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   closedManually: boolean;
+
+  decodeWorker: Worker | null;
 
   constructor({
     url = "/ws",
@@ -58,6 +69,8 @@ export class Connection {
     this.reconnectAttempt = 0;
     this.reconnectTimer = null;
     this.closedManually = false;
+
+    this.decodeWorker = null;
   }
 
   connect(): void {
@@ -78,6 +91,77 @@ export class Connection {
     const socket = new WebSocket(this.url);
     this.socket = socket;
 
+    const worker =
+      new Worker(
+        new URL(
+          "./decode.worker.ts",
+          import.meta.url
+        ),
+        {
+          type: "module"
+        }
+      );
+
+    this.decodeWorker = worker;
+
+    worker.addEventListener(
+      "message",
+      (
+        event: MessageEvent<DecodeResponse>
+      ) => {
+        if (
+          socket !== this.socket ||
+          worker !== this.decodeWorker
+        ) {
+          return;
+        }
+
+        const response = event.data;
+
+        performance.mark(
+          "m3-decode-end"
+        );
+
+        performance.measure(
+          "m3-decode",
+          "m3-decode-start",
+          "m3-decode-end"
+        );
+
+        if (!response.ok) {
+          this.onerror?.(
+            new Error(
+              `Failed to decode WebSocket message: ${response.error}`
+            )
+          );
+
+          return;
+        }
+
+        this.onmessage?.(
+          response.message
+        );
+      }
+    );
+
+    worker.addEventListener(
+      "error",
+      (event: ErrorEvent) => {
+        if (
+          socket !== this.socket ||
+          worker !== this.decodeWorker
+        ) {
+          return;
+        }
+
+        this.onerror?.(
+          new Error(
+            `Decode worker error: ${event.message}`
+          )
+        );
+      }
+    );
+
     socket.addEventListener("open", () => {
       if (socket !== this.socket) {
         return;
@@ -89,90 +173,200 @@ export class Connection {
       this.onopen?.();
     });
 
-    socket.addEventListener("message", async (event: MessageEvent) => {
-      if (socket !== this.socket) {
-        return;
-      }
-
-      let message: Message;
-
-      try {
-        console.log(
-          "WS DATA:",
-          typeof event.data,
-          event.data?.constructor?.name
-        );
-
-        if (event.data instanceof ArrayBuffer) {
-          message = decodeBinaryMessage(event.data);
-        } else if (
-          event.data &&
-          typeof event.data.arrayBuffer === "function"
-        ) {
-          const buffer = await event.data.arrayBuffer();
-          message = decodeBinaryMessage(buffer);
-        } else if (typeof event.data === "string") {
-          const result = parseMessage(
-            JSON.parse(event.data)
-          );
-
-          if (!result.ok) {
-            throw new Error(result.error);
-          }
-
-          message = result.message;
-        } else {
-          throw new Error(
-            `Unsupported WebSocket data type: ${typeof event.data}`
-          );
+    socket.addEventListener(
+      "message",
+      async (event: MessageEvent) => {
+        if (socket !== this.socket) {
+          return;
         }
 
-      } catch (error: unknown) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : String(error);
+        performance.mark(
+          "m3-decode-start"
+        );
+
+        if (
+          event.data instanceof ArrayBuffer
+        ) {
+          worker.postMessage(
+            {
+              buffer: event.data
+            },
+            [event.data]
+          );
+
+          return;
+        }
+
+        if (
+          event.data &&
+          typeof event.data.arrayBuffer ===
+            "function"
+        ) {
+          try {
+            const buffer =
+              await event.data.arrayBuffer();
+
+            if (
+              socket !== this.socket ||
+              worker !== this.decodeWorker
+            ) {
+              return;
+            }
+
+            worker.postMessage(
+              {
+                buffer
+              },
+              [buffer]
+            );
+          } catch (error: unknown) {
+            performance.mark(
+              "m3-decode-end"
+            );
+
+            performance.measure(
+              "m3-decode",
+              "m3-decode-start",
+              "m3-decode-end"
+            );
+
+            const message =
+              error instanceof Error
+                ? error.message
+                : String(error);
+
+            this.onerror?.(
+              new Error(
+                `Failed to read WebSocket binary message: ${message}`,
+                {
+                  cause: error
+                }
+              )
+            );
+          }
+
+          return;
+        }
+
+        if (
+          typeof event.data === "string"
+        ) {
+          try {
+            const result =
+              parseMessage(
+                JSON.parse(event.data)
+              );
+
+            if (!result.ok) {
+              throw new Error(
+                result.error
+              );
+            }
+
+            performance.mark(
+              "m3-decode-end"
+            );
+
+            performance.measure(
+              "m3-decode",
+              "m3-decode-start",
+              "m3-decode-end"
+            );
+
+            this.onmessage?.(
+              result.message
+            );
+          } catch (error: unknown) {
+            performance.mark(
+              "m3-decode-end"
+            );
+
+            performance.measure(
+              "m3-decode",
+              "m3-decode-start",
+              "m3-decode-end"
+            );
+
+            const message =
+              error instanceof Error
+                ? error.message
+                : String(error);
+
+            this.onerror?.(
+              new Error(
+                `Failed to decode WebSocket message: ${message}`,
+                {
+                  cause: error
+                }
+              )
+            );
+          }
+
+          return;
+        }
+
+        performance.mark(
+          "m3-decode-end"
+        );
+
+        performance.measure(
+          "m3-decode",
+          "m3-decode-start",
+          "m3-decode-end"
+        );
 
         this.onerror?.(
           new Error(
-            `Failed to decode WebSocket message: ${message}`
+            `Unsupported WebSocket data type: ${typeof event.data}`
           )
         );
-
-        return;
       }
+    );
 
-      this.onmessage?.(message);
-    });
+    socket.addEventListener(
+      "error",
+      (event: Event) => {
+        if (socket !== this.socket) {
+          return;
+        }
 
-    socket.addEventListener("error", (event: Event) => {
-      if (socket !== this.socket) {
-        return;
+        this.onerror?.(event);
       }
+    );
 
-      this.onerror?.(event);
-    });
+    socket.addEventListener(
+      "close",
+      (event: CloseEvent) => {
+        if (socket !== this.socket) {
+          return;
+        }
 
-    socket.addEventListener("close", (event: CloseEvent) => {
-      if (socket !== this.socket) {
-        return;
+        this.socket = null;
+
+        if (
+          worker === this.decodeWorker
+        ) {
+          worker.terminate();
+          this.decodeWorker = null;
+        }
+
+        this.onclose?.(event);
+
+        if (!this.closedManually) {
+          this.scheduleReconnect();
+        }
       }
-
-      this.socket = null;
-      this.onclose?.(event);
-
-      if (!this.closedManually) {
-        this.scheduleReconnect();
-      }
-    });
+    );
   }
 
   send(message: unknown): boolean {
-    const encoded = JSON.stringify(message);
+    const encoded =
+      JSON.stringify(message);
 
     if (
       this.socket &&
-      this.socket.readyState === WebSocket.OPEN
+      this.socket.readyState ===
+        WebSocket.OPEN
     ) {
       this.socket.send(encoded);
       return true;
@@ -189,6 +383,11 @@ export class Connection {
     this.closedManually = true;
     this.clearReconnectTimer();
 
+    if (this.decodeWorker) {
+      this.decodeWorker.terminate();
+      this.decodeWorker = null;
+    }
+
     if (this.socket) {
       this.socket.close();
       this.socket = null;
@@ -196,7 +395,10 @@ export class Connection {
   }
 
   scheduleReconnect(): void {
-    if (this.closedManually || this.reconnectTimer) {
+    if (
+      this.closedManually ||
+      this.reconnectTimer
+    ) {
       return;
     }
 
@@ -205,28 +407,36 @@ export class Connection {
       this.reconnectDelays.length - 1
     );
 
-    const delay = this.reconnectDelays[index];
+    const delay =
+      this.reconnectDelays[index];
 
     this.reconnectAttempt += 1;
 
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      this.connect();
-    }, delay);
+    this.reconnectTimer =
+      setTimeout(() => {
+        this.reconnectTimer = null;
+        this.connect();
+      }, delay);
   }
 
   flushQueue(): void {
     if (
       !this.socket ||
-      this.socket.readyState !== WebSocket.OPEN
+      this.socket.readyState !==
+        WebSocket.OPEN
     ) {
       return;
     }
 
-    while (this.queue.length > 0) {
-      const message = this.queue.shift();
+    while (
+      this.queue.length > 0
+    ) {
+      const message =
+        this.queue.shift();
 
-      if (message !== undefined) {
+      if (
+        message !== undefined
+      ) {
         this.socket.send(message);
       }
     }
@@ -237,7 +447,10 @@ export class Connection {
       return;
     }
 
-    clearTimeout(this.reconnectTimer);
+    clearTimeout(
+      this.reconnectTimer
+    );
+
     this.reconnectTimer = null;
   }
 }

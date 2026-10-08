@@ -40,7 +40,6 @@ import {
   attachWebSocketServer
 } from "./ws.js";
 
-
 const __filename =
   fileURLToPath(import.meta.url);
 
@@ -63,67 +62,45 @@ const publicDir =
     "public"
   );
 
-
 const MAX_BODY_SIZE =
   16 * 1024;
-
 
 async function readJsonBody(
   req: IncomingMessage
 ): Promise<Record<string, unknown>> {
-
   let body = "";
-
   let size = 0;
 
-
   for await (const chunk of req) {
-
     size +=
       Buffer.byteLength(chunk);
-
 
     if (
       size > MAX_BODY_SIZE
     ) {
-
       throw new Error(
         "Request body too large"
       );
-
     }
 
-
     body += chunk;
-
   }
-
 
   if (!body.trim()) {
-
     return {};
-
   }
 
-
   try {
-
     return JSON.parse(body);
-
   } catch {
-
     throw new Error(
       "Invalid JSON"
     );
-
   }
-
 }
-
 
 const rooms =
   new RoomManager();
-
 
 rooms.getOrCreate(
   "alpha",
@@ -135,9 +112,7 @@ rooms.getOrCreate(
   "Beta"
 );
 
-
 const MIME_TYPES: Record<string, string> = {
-
   ".html":
     "text/html; charset=utf-8",
 
@@ -170,19 +145,15 @@ const MIME_TYPES: Record<string, string> = {
 
   ".avif":
     "image/avif",
-
 };
-
 
 function sendJson(
   res: ServerResponse,
   statusCode: number,
   data: unknown
 ): void {
-
   const body =
     JSON.stringify(data);
-
 
   res.writeHead(
     statusCode,
@@ -192,26 +163,20 @@ function sendJson(
 
       "Content-Length":
         Buffer.byteLength(body),
-
     }
   );
 
-
   res.end(body);
-
 }
-
 
 async function serveStatic(
   res: ServerResponse,
   pathname: string
 ): Promise<void> {
-
   const requestedPath =
     pathname === "/"
       ? "/index.html"
       : pathname;
-
 
   const filePath =
     normalize(
@@ -221,13 +186,11 @@ async function serveStatic(
       )
     );
 
-
   if (
     !filePath.startsWith(
       clientDist
     )
   ) {
-
     sendJson(
       res,
       403,
@@ -237,22 +200,17 @@ async function serveStatic(
     );
 
     return;
-
   }
 
-
   try {
-
     const stats =
       statSync(
         filePath
       );
 
-
     if (
       !stats.isFile()
     ) {
-
       sendJson(
         res,
         404,
@@ -262,15 +220,12 @@ async function serveStatic(
       );
 
       return;
-
     }
-
 
     const body =
       await readFile(
         filePath
       );
-
 
     const contentType =
       MIME_TYPES[
@@ -280,7 +235,6 @@ async function serveStatic(
       ] ||
       "application/octet-stream";
 
-
     res.writeHead(
       200,
       {
@@ -289,15 +243,11 @@ async function serveStatic(
 
         "Content-Length":
           body.length,
-
       }
     );
 
-
     res.end(body);
-
   } catch {
-
     sendJson(
       res,
       404,
@@ -305,17 +255,13 @@ async function serveStatic(
         error: "Not found"
       }
     );
-
   }
-
 }
-
 
 async function servePublicFile(
   res: ServerResponse,
   pathname: string
 ): Promise<void> {
-
   const filePath =
     normalize(
       join(
@@ -324,13 +270,11 @@ async function servePublicFile(
       )
     );
 
-
   if (
     !filePath.startsWith(
       publicDir
     )
   ) {
-
     sendJson(
       res,
       403,
@@ -340,22 +284,17 @@ async function servePublicFile(
     );
 
     return;
-
   }
 
-
   try {
-
     const stats =
       statSync(
         filePath
       );
 
-
     if (
       !stats.isFile()
     ) {
-
       sendJson(
         res,
         404,
@@ -365,15 +304,12 @@ async function servePublicFile(
       );
 
       return;
-
     }
-
 
     const body =
       await readFile(
         filePath
       );
-
 
     const contentType =
       MIME_TYPES[
@@ -383,7 +319,6 @@ async function servePublicFile(
       ] ||
       "application/octet-stream";
 
-
     res.writeHead(
       200,
       {
@@ -392,15 +327,11 @@ async function servePublicFile(
 
         "Content-Length":
           body.length,
-
       }
     );
 
-
     res.end(body);
-
   } catch {
-
     sendJson(
       res,
       404,
@@ -408,22 +339,17 @@ async function servePublicFile(
         error: "Not found"
       }
     );
-
   }
-
 }
-
 
 const server =
   createServer(
     async (req, res) => {
-
       const url =
         new URL(
           req.url || "/",
           `http://${req.headers.host || HOST}`
         );
-
 
       // M4: спеціально блокуємо event loop
       // приблизно на 300 мс
@@ -431,17 +357,14 @@ const server =
         req.method === "GET" &&
         url.pathname === "/api/slow"
       ) {
-
         const start =
           Date.now();
-
 
         while (
           Date.now() - start < 300
         ) {
           // Навмисне блокування event loop
         }
-
 
         sendJson(
           res,
@@ -453,17 +376,13 @@ const server =
           }
         );
 
-
         return;
-
       }
-
 
       if (
         req.method === "GET" &&
         url.pathname === "/health"
       ) {
-
         sendJson(
           res,
           200,
@@ -475,15 +394,12 @@ const server =
         );
 
         return;
-
       }
-
 
       if (
         req.method === "GET" &&
         url.pathname === "/api/rooms"
       ) {
-
         sendJson(
           res,
           200,
@@ -494,9 +410,200 @@ const server =
         );
 
         return;
-
       }
 
+      // M4: статистика server tick
+      if (
+        req.method === "GET" &&
+        /^\/api\/rooms\/[^/]+\/stats$/.test(
+          url.pathname
+        )
+      ) {
+        const parts =
+          url.pathname.split("/");
+
+        const roomId =
+          parts[3];
+
+        if (!roomId) {
+          sendJson(
+            res,
+            400,
+            {
+              error:
+                "Room id is required"
+            }
+          );
+
+          return;
+        }
+
+        const room =
+          rooms.get(
+            roomId
+          );
+
+        if (!room) {
+          sendJson(
+            res,
+            404,
+            {
+              error:
+                "Room not found"
+            }
+          );
+
+          return;
+        }
+
+        sendJson(
+          res,
+          200,
+          {
+            roomId:
+              room.id,
+
+            tickRate:
+              room.match.tickRate,
+
+            bots:
+              room.match.bots.size,
+
+            players:
+              room.players.size,
+
+            tick:
+              room.match.getTickStats(),
+          }
+        );
+
+        return;
+      }
+
+      // M4: додавання AI-ботів у кімнату
+      if (
+        req.method === "POST" &&
+        /^\/api\/rooms\/[^/]+\/bots$/.test(
+          url.pathname
+        )
+      ) {
+        try {
+          const parts =
+            url.pathname.split("/");
+
+          const roomId =
+            parts[3];
+
+          if (!roomId) {
+            sendJson(
+              res,
+              400,
+              {
+                error:
+                  "Room id is required"
+              }
+            );
+
+            return;
+          }
+
+          const room =
+            rooms.get(
+              roomId
+            );
+
+          if (!room) {
+            sendJson(
+              res,
+              404,
+              {
+                error:
+                  "Room not found"
+              }
+            );
+
+            return;
+          }
+
+          const body =
+            await readJsonBody(
+              req
+            );
+
+          const rawCount =
+            body.count;
+
+          const count =
+            rawCount === undefined
+              ? 1
+              : typeof rawCount === "number"
+                ? rawCount
+                : NaN;
+
+          if (
+            !Number.isInteger(count) ||
+            count < 1 ||
+            count > 128
+          ) {
+            sendJson(
+              res,
+              400,
+              {
+                error:
+                  "Bot count must be an integer from 1 to 128"
+              }
+            );
+
+            return;
+          }
+
+          room.match.addBots(
+            count
+          );
+
+          sendJson(
+            res,
+            200,
+            {
+              ok: true,
+
+              roomId:
+                room.id,
+
+              added:
+                count,
+
+              bots:
+                room.match.bots.size,
+            }
+          );
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : String(error);
+
+          let status = 400;
+
+          if (
+            errorMessage ===
+            "Request body too large"
+          ) {
+            status = 413;
+          }
+
+          sendJson(
+            res,
+            status,
+            {
+              error:
+                errorMessage,
+            }
+          );
+        }
+
+        return;
+      }
 
       // Фон лобі
       if (
@@ -504,16 +611,13 @@ const server =
         url.pathname ===
           "/api/background.jpg"
       ) {
-
         await servePublicFile(
           res,
           "/api/background.jpg"
         );
 
         return;
-
       }
-
 
       // API для скачування/стриминга реплеєв матчів
       if (
@@ -522,15 +626,12 @@ const server =
           "/api/replays/"
         )
       ) {
-
         const roomId =
           url.pathname
             .split("/")
             .pop();
 
-
         try {
-
           const files =
             readdirSync(
               LOG_DIR
@@ -546,11 +647,9 @@ const server =
               )
               .sort();
 
-
           if (
             files.length === 0
           ) {
-
             sendJson(
               res,
               404,
@@ -561,15 +660,12 @@ const server =
             );
 
             return;
-
           }
-
 
           const latestFile =
             files.at(-1);
 
           if (!latestFile) {
-
             sendJson(
               res,
               404,
@@ -580,9 +676,7 @@ const server =
             );
 
             return;
-
           }
-
 
           const latestLogPath =
             join(
@@ -590,12 +684,10 @@ const server =
               latestFile
             );
 
-
           const stat =
             statSync(
               latestLogPath
             );
-
 
           res.writeHead(
             200,
@@ -608,24 +700,19 @@ const server =
 
               "Content-Disposition":
                 `attachment; filename="${latestFile}"`,
-
             }
           );
-
 
           const readStream =
             createReadStream(
               latestLogPath
             );
 
-
           await pipeline(
             readStream,
             res
           );
-
         } catch (error: unknown) {
-
           const errorCode =
             typeof error === "object" &&
             error !== null &&
@@ -633,22 +720,18 @@ const server =
               ? error.code
               : undefined;
 
-
           if (
             errorCode !==
             "ERR_STREAM_PREMATURE_CLOSE"
           ) {
-
             console.error(
               "Replay streaming error:",
               error
             );
 
-
             if (
               !res.headersSent
             ) {
-
               sendJson(
                 res,
                 500,
@@ -657,31 +740,22 @@ const server =
                     "Internal server error"
                 }
               );
-
             }
-
           }
-
         }
 
-
         return;
-
       }
-
 
       if (
         req.method === "POST" &&
         url.pathname === "/api/rooms"
       ) {
-
         try {
-
           const body =
             await readJsonBody(
               req
             );
-
 
           const id =
             typeof body.id ===
@@ -689,20 +763,17 @@ const server =
               ? body.id.trim()
               : "";
 
-
           const name =
             typeof body.name ===
             "string"
               ? body.name.trim()
               : "";
 
-
           if (
             !/^[a-zA-Z0-9_-]{1,32}$/.test(
               id
             )
           ) {
-
             sendJson(
               res,
               400,
@@ -713,15 +784,12 @@ const server =
             );
 
             return;
-
           }
-
 
           if (
             name.length < 1 ||
             name.length > 64
           ) {
-
             sendJson(
               res,
               400,
@@ -732,14 +800,11 @@ const server =
             );
 
             return;
-
           }
-
 
           if (
             rooms.get(id)
           ) {
-
             sendJson(
               res,
               409,
@@ -750,16 +815,13 @@ const server =
             );
 
             return;
-
           }
-
 
           const room =
             rooms.create(
               id,
               name
             );
-
 
           sendJson(
             res,
@@ -774,41 +836,30 @@ const server =
 
                 players:
                   room.players.size,
-
               }
             }
           );
-
         } catch (error: unknown) {
-
           const errorMessage =
             error instanceof Error
               ? error.message
               : String(error);
 
-
           let status = 400;
-
 
           if (
             errorMessage ===
             "Request body too large"
           ) {
-
             status = 413;
-
           }
-
 
           if (
             errorMessage ===
             "Server room limit reached"
           ) {
-
             status = 503;
-
           }
-
 
           sendJson(
             res,
@@ -818,19 +869,14 @@ const server =
                 errorMessage,
             }
           );
-
         }
 
-
         return;
-
       }
-
 
       if (
         req.method !== "GET"
       ) {
-
         sendJson(
           res,
           405,
@@ -841,18 +887,14 @@ const server =
         );
 
         return;
-
       }
-
 
       await serveStatic(
         res,
         url.pathname
       );
-
     }
   );
-
 
 const wss =
   attachWebSocketServer(
@@ -860,65 +902,49 @@ const wss =
     rooms
   );
 
-
 server.listen(
   PORT,
   HOST,
   () => {
-
     console.log(
       `Dogfight server listening on http://${HOST}:${PORT}`
     );
-
   }
 );
-
 
 function shutdown(
   signal: string
 ): void {
-
   console.log(
     `Received ${signal}, shutting down...`
   );
-
 
   for (
     const socket of
     wss.clients
   ) {
-
     socket.close(
       1001,
       "Server shutting down"
     );
-
   }
-
 
   wss.close(
     () => {
-
       server.close(
         () => {
-
           console.log(
             "Server stopped."
           );
 
-
           process.exit(
             0
           );
-
         }
       );
-
     }
   );
-
 }
-
 
 process.on(
   "SIGINT",

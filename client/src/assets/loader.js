@@ -340,7 +340,8 @@ function resolveAssetUrl(
     } catch (error) {
 
         throw new Error(
-            `Не вдалося створити URL ресурсу "${assetUrl}" відносно "${manifestUrl}": ${error.message}`
+            `Не вдалося створити URL ресурсу "${assetUrl}" відносно "${manifestUrl}": ${error.message}`,
+            { cause: error }
         );
     }
 }

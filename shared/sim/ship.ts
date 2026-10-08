@@ -33,7 +33,10 @@ export class Ship extends Entity {
     return this.#hp;
   }
 
-  update(dt: number, inputs: ShipInput): void {
+  update(
+    dt: number,
+    inputs: ShipInput
+  ): void {
     const input = inputs.input;
 
     const rotationSpeed = 3;
@@ -42,52 +45,71 @@ export class Ship extends Entity {
     const maxSpeed = 400;
 
     if (input.isDown('ArrowLeft')) {
-      this.angle -= rotationSpeed * dt;
+      this.angle -=
+        rotationSpeed * dt;
     }
 
     if (input.isDown('ArrowRight')) {
-      this.angle += rotationSpeed * dt;
+      this.angle +=
+        rotationSpeed * dt;
     }
 
     this.thrust =
-      input.isDown('ArrowUp') ? 1 : 0;
+      input.isDown('ArrowUp')
+        ? 1
+        : 0;
 
-    let velocity = this.vel;
+    const velocity = this.vel;
 
     if (this.thrust) {
-      const direction =
-        Vector2.fromAngle(
-          this.angle - Math.PI / 2
-        );
+      const angle =
+        this.angle - Math.PI / 2;
 
-      velocity = new Vector2(
-        velocity.x +
-          direction.x * thrustPower * dt,
-        velocity.y +
-          direction.y * thrustPower * dt
-      );
+      const directionX =
+        Math.cos(angle);
+
+      const directionY =
+        Math.sin(angle);
+
+      velocity.x +=
+        directionX *
+        thrustPower *
+        dt;
+
+      velocity.y +=
+        directionY *
+        thrustPower *
+        dt;
     }
 
     const dragFactor =
-      Math.pow(drag, dt * 60);
+      Math.pow(
+        drag,
+        dt * 60
+      );
 
-    velocity = new Vector2(
-      velocity.x * dragFactor,
-      velocity.y * dragFactor
+    velocity.x *= dragFactor;
+    velocity.y *= dragFactor;
+
+    const speed = Math.hypot(
+      velocity.x,
+      velocity.y
     );
 
-    const speed = velocity.length();
-
     if (speed > maxSpeed) {
-      velocity = velocity.normalize().scale(maxSpeed);
-    }
+      const scale =
+        maxSpeed / speed;
 
-    this.vel = velocity;
+      velocity.x *= scale;
+      velocity.y *= scale;
+    }
 
     super.update(dt);
   }
 
-  takeDamage(amount: number): void {
+  takeDamage(
+    amount: number
+  ): void {
     if (this.shield) {
       this.shield = false;
       return;
@@ -117,21 +139,25 @@ export class Ship extends Entity {
 
     const bulletX =
       this.pos.x +
-      direction.x * (this.radius + 4);
+      direction.x *
+      (this.radius + 4);
 
     const bulletY =
       this.pos.y +
-      direction.y * (this.radius + 4);
+      direction.y *
+      (this.radius + 4);
 
     const bulletSpeed = 500;
 
     const bulletVx =
       this.vel.x +
-      direction.x * bulletSpeed;
+      direction.x *
+      bulletSpeed;
 
     const bulletVy =
       this.vel.y +
-      direction.y * bulletSpeed;
+      direction.y *
+      bulletSpeed;
 
     const bullet = new Bullet(
       bulletX,

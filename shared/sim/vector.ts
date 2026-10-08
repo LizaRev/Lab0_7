@@ -1,7 +1,7 @@
 export class Vector2 {
   constructor(
-    public readonly x: number = 0,
-    public readonly y: number = 0
+    public x: number = 0,
+    public y: number = 0
   ) {}
 
   add(other: Vector2): Vector2 {
@@ -25,8 +25,29 @@ export class Vector2 {
     );
   }
 
+  addInPlace(other: Vector2): Vector2 {
+    this.x += other.x;
+    this.y += other.y;
+    return this;
+  }
+
+  scaleInPlace(value: number): Vector2 {
+    this.x *= value;
+    this.y *= value;
+    return this;
+  }
+
+  set(x: number, y: number): Vector2 {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+
   length(): number {
-    return Math.hypot(this.x, this.y);
+    return Math.hypot(
+      this.x,
+      this.y
+    );
   }
 
   normalize(): Vector2 {
@@ -42,6 +63,21 @@ export class Vector2 {
     );
   }
 
+  normalizeInPlace(): Vector2 {
+    const length = this.length();
+
+    if (length === 0) {
+      this.x = 0;
+      this.y = 0;
+      return this;
+    }
+
+    this.x /= length;
+    this.y /= length;
+
+    return this;
+  }
+
   rotate(angle: number): Vector2 {
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
@@ -53,7 +89,10 @@ export class Vector2 {
   }
 
   dot(other: Vector2): number {
-    return this.x * other.x + this.y * other.y;
+    return (
+      this.x * other.x +
+      this.y * other.y
+    );
   }
 
   static fromAngle(angle: number): Vector2 {

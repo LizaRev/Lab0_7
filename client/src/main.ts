@@ -114,6 +114,7 @@ type LoopStats = {
   stepsPerSecond: number;
   framesPerSecond: number;
   lastFrameDuration: number;
+  frameTimeSamples: number[];
 };
 
 type JoinedData = {
@@ -139,6 +140,32 @@ function isJoinedData(
   }
 
   return true;
+}
+
+function percentile(
+  values: number[],
+  percentileValue: number
+): number {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const index =
+    Math.ceil(
+      (percentileValue / 100) *
+      values.length
+    ) - 1;
+
+  const safeIndex =
+    Math.max(
+      0,
+      Math.min(
+        index,
+        values.length - 1
+      )
+    );
+
+  return values[safeIndex] ?? 0;
 }
 
 async function startGame(): Promise<void> {
@@ -864,6 +891,10 @@ async function startGame(): Promise<void> {
     snapshot: Snapshot | null
   ): void {
 
+    performance.mark(
+      "m3-reconcile-start"
+    );
+
     const entities =
       snapshot?.world?.entities ||
       [];
@@ -902,6 +933,16 @@ async function startGame(): Promise<void> {
       }
 
     }
+
+    performance.mark(
+      "m3-reconcile-end"
+    );
+
+    performance.measure(
+      "m3-reconcile",
+      "m3-reconcile-start",
+      "m3-reconcile-end"
+    );
 
   }
 
@@ -1368,18 +1409,35 @@ async function startGame(): Promise<void> {
       0,
 
     lastFrameDuration:
-      0
+      0,
+
+    frameTimeSamples:
+      []
 
   };
 
 
   function render(): void {
 
+    performance.mark(
+      "m3-render-start"
+    );
+
     if (latestSnapshot) {
 
-      applySnapshot(
-        latestSnapshot
-      );
+      const snapshotShip =
+        getSnapshotShip(
+          latestSnapshot
+        );
+
+      renderShip =
+        createRenderShip(
+          snapshotShip
+        );
+
+      world.score =
+        latestSnapshot?.world?.score ??
+        0;
 
       renderWorld =
         createInterpolatedRenderWorld();
@@ -1398,18 +1456,17 @@ async function startGame(): Promise<void> {
       loop.getStats();
 
 
-    loopStats = {
+    loopStats.stepsPerSecond =
+      stats.stepsPerSecond;
 
-      stepsPerSecond:
-        stats.stepsPerSecond,
+    loopStats.framesPerSecond =
+      stats.framesPerSecond;
 
-      framesPerSecond:
-        stats.framesPerSecond,
+    loopStats.lastFrameDuration =
+      stats.lastFrameDuration;
 
-      lastFrameDuration:
-        stats.lastFrameDuration
-
-    };
+    loopStats.frameTimeSamples =
+      stats.frameTimeSamples;
 
 
     hud.update(
@@ -1427,6 +1484,16 @@ async function startGame(): Promise<void> {
       assets
     );
 
+    performance.mark(
+      "m3-render-end"
+    );
+
+    performance.measure(
+      "m3-render",
+      "m3-render-start",
+      "m3-render-end"
+    );
+
   }
 
 
@@ -1442,6 +1509,10 @@ async function startGame(): Promise<void> {
 
 
       simulate(dt: number) {
+
+        performance.mark(
+          "m3-simulate-start"
+        );
 
         inputAccumulator +=
           dt;
@@ -1533,6 +1604,16 @@ async function startGame(): Promise<void> {
 
         input.endFrame();
 
+        performance.mark(
+          "m3-simulate-end"
+        );
+
+        performance.measure(
+          "m3-simulate",
+          "m3-simulate-start",
+          "m3-simulate-end"
+        );
+
       },
 
 
@@ -1542,6 +1623,59 @@ async function startGame(): Promise<void> {
 
 
   loop.start();
+
+
+  window.setTimeout(() => {
+
+    const samples =
+      loop.getStats().frameTimeSamples;
+
+    if (samples.length === 0) {
+
+      console.log(
+        "M3 baseline: no frame samples collected"
+      );
+
+      return;
+
+    }
+
+    const sortedSamples =
+      [...samples].sort(
+        (a, b) =>
+          a - b
+      );
+
+    console.table({
+
+      samples:
+        sortedSamples.length,
+
+      "frame p50 (ms)":
+        percentile(
+          sortedSamples,
+          50
+        ).toFixed(3),
+
+      "frame p95 (ms)":
+        percentile(
+          sortedSamples,
+          95
+        ).toFixed(3),
+
+      "frame p99 (ms)":
+        percentile(
+          sortedSamples,
+          99
+        ).toFixed(3)
+
+    });
+
+    console.log(
+      "M3 baseline: 30-second frame-time measurement complete"
+    );
+
+  }, 30_000);
 
 }
 

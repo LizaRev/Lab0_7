@@ -25,6 +25,8 @@ import {
   decodeBinaryMessage,
 } from "../../shared/protocol/binary.js";
 
+import { TokenBucket } from "./rate-limit.js";
+
 const JOIN_TIMEOUT_MS = 5_000;
 const HEARTBEAT_MS = 15_000;
 const MAX_MISSED_PONGS = 2;
@@ -123,39 +125,11 @@ export function attachWebSocketServer(
       let joined = false;
       let missedPongs = 0;
 
-      let tokens =
-        TOKEN_BUCKET_CAPACITY;
-
-      let lastRefill =
-        Date.now();
-
-      function checkRateLimit(): boolean {
-        const now =
-          Date.now();
-
-        const elapsed =
-          (now - lastRefill) / 1000;
-
-        lastRefill = now;
-
-        tokens =
-          Math.min(
-            TOKEN_BUCKET_CAPACITY,
-            tokens +
-              elapsed *
-              TOKEN_REFILL_RATE
-          );
-
-        if (
-          tokens < 1
-        ) {
-          return false;
-        }
-
-        tokens -= 1;
-
-        return true;
-      }
+      const rateLimiter =
+        new TokenBucket(
+          TOKEN_BUCKET_CAPACITY,
+          TOKEN_REFILL_RATE
+        );
 
       const send = (
         message: unknown,
@@ -282,7 +256,7 @@ export function attachWebSocketServer(
           isBinary: boolean
         ) => {
           if (
-            !checkRateLimit()
+            !rateLimiter.check()
           ) {
             console.warn(
               `Rate limit exceeded for player ${player.id}`
